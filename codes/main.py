@@ -16,12 +16,14 @@ from tkinter import (
     VERTICAL,
     HORIZONTAL,
 )
-from datetime import datetime
+import datetime
 import numpy as np
 
 # Load the CSV file (replace 'your_file.csv' with the actual file path)
 data = pd.read_csv("../data/20241114_LEXIAngleData_20250302Landing.csv")
 data["epoch_utc"] = pd.to_datetime(data["epoch_utc"])
+# Set the timezones to UTC
+data["epoch_utc"] = data["epoch_utc"].dt.tz_localize("UTC")
 
 
 # Function to fetch and display data based on user inputs
@@ -29,10 +31,19 @@ def fetch_data(event=None):
     try:
         # Determine the time input: user-specified or current UTC
         if use_current_time.get():
-            input_time = datetime.utcnow()
+            input_time = datetime.datetime.now(datetime.timezone.utc)
         else:
             user_input = timestamp_input.get()
             input_time = pd.to_datetime(user_input)
+            # Set the timezone to UTC
+            input_time = input_time.tz_localize("UTC")
+            if pd.isnull(input_time):
+                # Print that the input is null, so default to current time
+                messagebox.showwarning(
+                    "Warning",
+                    "Invalid timestamp. Defaulting to current UTC time.",
+                )
+                input_time = datetime.datetime.now(datetime.timezone.utc)
 
         # Get the dropdown selections
         display_option = dropdown_selection.get()
@@ -137,7 +148,7 @@ def toggle_current_time():
     if use_current_time.get():
         timestamp_input_field.config(state=DISABLED)
         current_time_label.config(
-            text=f"Current UTC Time: {datetime.utcnow():%Y-%m-%d %H:%M:%S}"
+            text=f"Current UTC Time: {datetime.datetime.now(datetime.timezone.utc):%Y-%m-%d %H:%M:%S}"
         )
     else:
         timestamp_input_field.config(state=NORMAL)
