@@ -14,8 +14,7 @@ The code reads the csv file and stores the look direction values in a pandas dat
 then uses the pandas dataframe to retrieve the look direction values for a given time.
 
 Once it is opened, it looks like this:
-![Look Direction Viewer](../figures/lexi_look_direction_viewer.png)
-
+![Look Direction Viewer](figures/lexi_look_direction_viewer.png)
 ## Installation
 
 
