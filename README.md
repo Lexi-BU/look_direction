@@ -1,6 +1,21 @@
 # look_direction
 Repository for the real-time look direction values for LEXI
 
+## Description
+This repository contains the code for the real-time look direction values for LEXI. The code is
+written in python3 and uses the tkinter library for the GUI and matplotlib for plotting the look
+direction values.
+
+The code uses a lookup table to retrieve the look direction values for a given time. The lookup
+table is a csv file that contains the look direction values for a given time. The csv file is
+located in the look_direction/data directory.
+
+The code reads the csv file and stores the look direction values in a pandas dataframe. The code
+then uses the pandas dataframe to retrieve the look direction values for a given time.
+
+Once it is opened, it looks like this:
+![Look Direction Viewer](../figures/lexi_look_direction_viewer.png)
+
 ## Installation
 
 
