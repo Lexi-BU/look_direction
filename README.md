@@ -23,7 +23,7 @@ python3 -m venv lexi_look_direction
 source lexi_look_direction/bin/activate
 ```
 
-- Name of required packages:
+- Install the following required packages:
 ```bash
 pip install pandas>=2.2.3
 pip install tk
