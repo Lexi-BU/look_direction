@@ -101,7 +101,8 @@ def fetch_data(event=None):
             return
 
         # Prepare table data based on dropdown selection and selected keys
-        for key in selected_keys:
+        # Add row to the table with alternating row colors
+        for idx, key in enumerate(selected_keys):
             az_col = f"az_{key.lower()}"
             el_col = f"el_{key.lower()}"
             ra_col = f"ra_{key.lower()}"
@@ -119,13 +120,16 @@ def fetch_data(event=None):
                 ra = round(np.radians(ra), sig_figs) if ra != "N/A" else "N/A"
                 dec = round(np.radians(dec), sig_figs) if dec != "N/A" else "N/A"
 
-            # Add row to the table
+            # Determine row tag (evenrow or oddrow)
+            row_tag = "evenrow" if idx % 2 == 0 else "oddrow"
+
+            # Insert the row with the correct tag
             if display_option == "AZ-EL":
-                table.insert("", "end", values=(key, az, el))
+                table.insert("", "end", values=(key, az, el), tags=(row_tag,))
             elif display_option == "RA-Dec":
-                table.insert("", "end", values=(key, ra, dec))
+                table.insert("", "end", values=(key, ra, dec), tags=(row_tag,))
             elif display_option == "Both":
-                table.insert("", "end", values=(key, az, el, ra, dec))
+                table.insert("", "end", values=(key, az, el, ra, dec), tags=(row_tag,))
 
         # Adjust window size dynamically
         num_rows = len(selected_keys)
@@ -171,11 +175,20 @@ root = Tk()
 root.title("LEXI Pointing Data Viewer")
 root.geometry("800x600")
 
-# Create two frames for the two columns
-left_frame = ttk.Frame(root, padding=10)
+# Set the font for the entire GUI
+root.option_add("*Font", "Helvetica 12")
+
+# Define a custom style for the left frame
+style = ttk.Style()
+style.configure(
+    "Left.TFrame",
+)
+
+# Create the left frame with the custom style
+left_frame = ttk.Frame(root, padding=10, style="Left.TFrame")
 left_frame.grid(row=0, column=0, sticky="nsew")
 
-right_frame = ttk.Frame(root, padding=10)
+right_frame = ttk.Frame(root, padding=10, style="Left.TFrame")
 right_frame.grid(row=0, column=1, sticky="nsew")
 
 left_row = 0
@@ -198,12 +211,16 @@ Label(right_frame, text="").grid(row=right_row + 2, column=1)
 
 # Checkbox to use the current UTC time
 use_current_time = IntVar()
+# Set the initial state of the checkbox to checked
+use_current_time.set(0)
+
 Checkbutton(
     left_frame,
     text="Use Current Time (UTC)",
     variable=use_current_time,
     command=toggle_current_time,
 ).grid(row=left_row + 1, column=0, sticky="w", padx=5, pady=5)
+
 
 # Label to display the current UTC time
 current_time_label = Label(left_frame, text="", fg="blue")
@@ -235,7 +252,7 @@ Label(left_frame, text="Select Angle Unit:").grid(
 angle_unit_selection = StringVar(value="Degree")
 OptionMenu(
     right_frame, angle_unit_selection, "Degree", "Radians", command=fetch_data
-).grid(row=right_row + 5, column=1, sticky="E", padx=5, pady=5)
+).grid(row=right_row + 5, column=1, sticky="e", padx=5, pady=5)
 
 # Checkboxes for keys
 # Label for "Select Targets:"
@@ -253,6 +270,11 @@ for i, key in enumerate(keys):
     cb = Checkbutton(right_frame, text=key, variable=var, command=fetch_data)
     # Place the checkbox with the label in the second column, aligned to the left by default
     cb.grid(row=right_row + 6 + i, column=1, sticky="E", padx=5, pady=5)
+
+# Set the initial staet of all checkboxes to checked
+for var in checkboxes.values():
+    var.set(0)
+
 # Button to toggle all checkboxes
 Button(left_frame, text="Check/Uncheck All", command=toggle_checkboxes).grid(
     row=left_row + 7, column=0, sticky="w", padx=5, pady=5
@@ -268,16 +290,58 @@ Button(left_frame, text="Fetch Data", command=fetch_data, fg="green").grid(
 )
 
 # Label to display the closest timestamp
-closest_timestamp_label = Label(right_frame, text="", fg="blue")
+closest_timestamp_label = Label(right_frame, text="", fg="red")
 closest_timestamp_label.grid(row=right_row + 12, column=1, padx=5, pady=5)
 
 # Scrollable table for displaying results
 table_frame = ttk.Frame(root)
 table_frame.grid(row=1, column=0, columnspan=2, sticky="nsew")
 
-table = ttk.Treeview(table_frame, show="headings", height=15)
-table.pack(side="left", fill="both", expand=True)
+# Define custom style for the Treeview
+style = ttk.Style()
+style.theme_use("default")
+style.configure(
+    "Custom.Treeview",
+    background="white",
+    foreground="black",
+    rowheight=25,
+    fieldbackground="white",
+    borderwidth=1,
+)
+style.map("Custom.Treeview", background=[("selected", "#347083")])  # Highlight color
 
+# Apply striped row colors (alternating shades of gray)
+style.configure(
+    "Custom.Treeview.Heading",
+    font=("Helvetica", 14, "bold"),
+    background="#f4f4f4",
+    foreground="black",
+    relief="raised",
+)
+style.layout(
+    "Custom.Treeview.Heading",
+    [("Treeheading.cell", {"sticky": "nsew"}), ("Treeheading.text", {"sticky": "ew"})],
+)
+
+# Define the font of the table rows and columns other than the headings
+style.configure("Custom.Treeview", font=("Helvetica", 12))
+
+table = ttk.Treeview(
+    table_frame,
+    style="Custom.Treeview",
+    show="headings",
+    height=10,
+)
+
+table.pack(side="left", fill="both", expand=True)
+# Set custom tag styles for alternating row colors
+table.tag_configure("evenrow", background="#b1babf")
+table.tag_configure("oddrow", background="#f7f0f0")
+
+# Get the columns in the table
+columns = table["columns"]
+
+print(columns)
 # Add scrollbars
 vsb = Scrollbar(table_frame, orient=VERTICAL, command=table.yview)
 vsb.pack(side="right", fill="y")
@@ -286,6 +350,10 @@ hsb.pack(side="bottom", fill="x")
 
 table.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
 
+# Add a button above quit button to clear the table
+Button(
+    left_frame, text="Clear Table", command=lambda: table.delete(*table.get_children())
+).grid(row=left_row + 10, column=0, sticky="w", padx=5, pady=10)
 # Quit button
 Button(left_frame, text="Quit", command=root.destroy, fg="red").grid(
     row=left_row + 11, column=0, sticky="w", padx=5, pady=10
