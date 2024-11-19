@@ -17,7 +17,11 @@ from tkinter import (
     HORIZONTAL,
 )
 import datetime
+import time
 import numpy as np
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.pyplot as plt
 
 # Load the CSV file (replace 'your_file.csv' with the actual file path)
 data = pd.read_csv("../data/20241114_LEXIAngleData_20250302Landing.csv")
@@ -25,8 +29,157 @@ data["epoch_utc"] = pd.to_datetime(data["epoch_utc"])
 # Set the timezones to UTC
 data["epoch_utc"] = data["epoch_utc"].dt.tz_localize("UTC")
 
-# Record the start time of the GUI
-start_time = datetime.datetime.now(datetime.timezone.utc)
+
+class DynamicMockDateTime(datetime.datetime):
+    """A mock datetime class to simulate a dynamically increasing datetime."""
+
+    _start_time = None
+    _mock_start_time = None
+
+    @classmethod
+    def initialize(cls, mock_start_time):
+        """Set the mock start time and initialize the reference system start time."""
+        cls._start_time = time.time()  # Real system time when mock starts
+        cls._mock_start_time = mock_start_time
+
+    @classmethod
+    def now(cls, tz=None):
+        """Return the simulated current time."""
+        if cls._start_time is None or cls._mock_start_time is None:
+            raise RuntimeError("DynamicMockDateTime not initialized.")
+        # Calculate the elapsed time since initialization
+        elapsed_seconds = time.time() - cls._start_time
+        # Add the elapsed time to the mock start time
+        mock_now = cls._mock_start_time + datetime.timedelta(hours=3 * elapsed_seconds)
+        if tz:
+            return mock_now.astimezone(tz)
+        return mock_now
+
+    @classmethod
+    def fromordinal(cls, ordinal):
+        """Simulate the fromordinal method."""
+        return cls._mock_start_time + datetime.timedelta(days=ordinal)
+
+
+def update_plot():
+    # try:
+    for i in range(1):
+        # Get the selected keywords
+        selected_keys = [key for key, var in checkboxes.items() if var.get() == 1]
+
+        if not selected_keys:
+            messagebox.showwarning("Warning", "No keys selected for plotting.")
+            return
+
+        # Filter data from the start time to the current UTC time
+        current_time = datetime.datetime.now(datetime.timezone.utc)
+        filtered_data = data[
+            (data["epoch_utc"] >= mock_start_time) & (data["epoch_utc"] <= current_time)
+        ]
+        # Make a dictionary of color and marker for each key
+        color_dict_az = {
+            "Earth": "blue",
+            "Sun": "orange",
+            "Crab": "green",
+            "Sco": "red",
+            "Mag": "purple",
+            "Bonus": "brown",
+        }
+        marker_dict_az = {
+            "Earth": "o",
+            "Sun": "x",
+            "Crab": "^",
+            "Sco": "s",
+            "Mag": "p",
+            "Bonus": "P",
+        }
+        color_dict_el = {
+            "Earth": "cyan",
+            "Sun": "magenta",
+            "Crab": "yellow",
+            "Sco": "black",
+            "Mag": "pink",
+            "Bonus": "gray",
+        }
+        marker_dict_el = {
+            "Earth": "o",
+            "Sun": "x",
+            "Crab": "^",
+            "Sco": "s",
+            "Mag": "p",
+            "Bonus": "P",
+        }
+        # Create a new figure
+        fig = Figure(figsize=(8, 4), dpi=100)
+        ax = fig.add_subplot(111)
+        ax_twin = ax.twinx()
+
+        # Plot data for each selected key
+        for key in selected_keys:
+            az_col = f"az_{key.lower()}"
+            el_col = f"el_{key.lower()}"
+            if az_col in data.columns and el_col in data.columns:
+                x_data = np.array(filtered_data["epoch_utc"].values)
+                y_data_az = np.array(filtered_data[az_col].values)
+                ax.scatter(
+                    x_data,
+                    y_data_az,
+                    label=f"{key} AZ",
+                    color=color_dict_az[key],
+                    marker=marker_dict_az[key],
+                )
+
+                y_data_el = np.array(filtered_data[el_col].values)
+                ax_twin.scatter(
+                    x_data,
+                    y_data_el,
+                    label=f"{key} EL",
+                    color=color_dict_el[key],
+                    marker=marker_dict_el[key],
+                )
+
+        # Format the plot
+        ax.set_title("Key Data as a Function of Time")
+        ax.set_xlabel("Time (UTC)")
+        ax.set_ylabel("AZ (Degree)")
+        ax.legend(loc="upper left")
+        ax.grid()
+        ax.tick_params(axis="x", rotation=45)
+        ax.set_xlim(mock_start_time, current_time)
+        # ax.set_ylim(0, 360)
+        ax_twin.set_ylabel("EL (Degree)")
+        ax_twin.legend(loc="upper right")
+        # ax_twin.set_ylim(-90, 90)
+
+        # Format the x-ticks so that the date and time are always displayed in the format "YYYY-MM-DD
+        # HH:MM:SS"
+        # ax.xaxis.set_major_formatter(
+        #     plt.FuncFormatter(
+        #         lambda x, _: time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(x))
+        #     )
+        # )
+        # Rotate the x-ticks for better readability
+        ax.tick_params(axis="x", rotation=0)
+        # fig.autofmt_xdate()
+
+        # Display at most 5 ticks on the x-axis
+        ax.xaxis.set_major_locator(plt.MaxNLocator(5))
+        # Save the plot to a file
+        fig.savefig("plot.png")
+        # Clear any existing plot in the canvas frame
+        for widget in plot_frame.winfo_children():
+            widget.destroy()
+
+        # Embed the figure in the Tkinter GUI
+        canvas = FigureCanvasTkAgg(fig, master=plot_frame)
+        canvas_widget = canvas.get_tk_widget()
+        canvas_widget.pack(fill="both", expand=True)
+        canvas.draw()
+
+    # except Exception as e:
+    #     # messagebox.showerror("Error", f"Failed to update plot: {e}")
+    #     print(e)
+    # pass
 
 
 # Function to fetch and display data based on user inputs
@@ -159,6 +312,7 @@ def periodic_update():
         )
         # Refresh the table with the latest data
         fetch_data()
+        update_plot()
         # Schedule the next update in 1000 ms (1 second)
         root.after(1000, periodic_update)
 
@@ -182,6 +336,15 @@ def toggle_checkboxes():
     for var in checkboxes.values():
         var.set(new_state)
     fetch_data()  # Fetch data automatically
+    update_plot()  # Update the plot automatically
+
+
+# Initialize the mock datetime class
+mock_start_time = datetime.datetime(2025, 3, 1, 0, 0, 0, tzinfo=datetime.timezone.utc)
+DynamicMockDateTime.initialize(mock_start_time)
+
+# Replace the datetime class with the mock class
+datetime.datetime = DynamicMockDateTime
 
 
 # Initialize the tkinter GUI
@@ -210,6 +373,14 @@ right_row = 0
 # Configure column weights
 root.grid_columnconfigure(0, weight=1)
 root.grid_columnconfigure(1, weight=1)
+
+# Frame for the plot
+plot_frame = ttk.Frame(root, padding=10)
+plot_frame.grid(row=2, column=0, columnspan=2, sticky="nsew")
+
+# Configure row weights for the plot frame
+root.grid_rowconfigure(2, weight=1)
+
 
 # Input field for timestamp
 Label(left_frame, text="Enter Timestamp (YYYY-MM-DD HH:MM:SS):").grid(
@@ -288,6 +459,9 @@ for i, key in enumerate(keys):
 # Set the initial staet of all checkboxes to checked
 for var in checkboxes.values():
     var.set(0)
+
+# Set the initial state of the Earth checkbox to checked
+checkboxes["Earth"].set(1)
 
 # Button to toggle all checkboxes
 Button(left_frame, text="Check/Uncheck All", command=toggle_checkboxes).grid(

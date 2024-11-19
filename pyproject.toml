@@ -6,6 +6,7 @@ authors = ["Ramiz Qudsi <qudsiramiz@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
+numpy = "<2"
 python = ">=3.10, <3.11"
 pandas = "^2.2.3"
 tk = "^0.1.0"
