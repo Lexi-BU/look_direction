@@ -17,16 +17,55 @@ from tkinter import (
     HORIZONTAL,
 )
 import datetime
+import glob
 import numpy as np
 
-# Load the CSV file (replace 'your_file.csv' with the actual file path)
-data = pd.read_csv("../data/20241114_LEXIAngleData_20250302Landing.csv")
-data["epoch_utc"] = pd.to_datetime(data["epoch_utc"])
-# Set the timezones to UTC
-data["epoch_utc"] = data["epoch_utc"].dt.tz_localize("UTC")
 
-# Record the start time of the GUI
-start_time = datetime.datetime.now(datetime.timezone.utc)
+def get_lexi_look_direction_data():
+    # Get all the files in the directory
+    files = glob.glob("../data/from_lexi/LEXI Gimbal Angle*.csv")
+
+    # Create an empty dataframe
+    df_list = []
+
+    # Loop through all the files
+    for file in files:
+        # Read the file
+        data = pd.read_csv(file, skiprows=1)
+
+        # Append the data to the list
+        df_list.append(data)
+
+    # Concatenate the data
+    df = pd.concat(df_list)
+
+    df.columns = ["epoch_utc", "dec_lexi", "ra_lexi"]
+
+    # Remove the degree symbol
+    df["dec_lexi"] = df["dec_lexi"].str.replace("°", "").astype(float)
+    df["ra_lexi"] = df["ra_lexi"].str.replace("°", "").astype(float)
+    # Set the time zone to UTC
+    df["epoch_utc"] = pd.to_datetime(df["epoch_utc"], utc=True)
+    df = df.set_index("epoch_utc")
+    # Sort the data
+    df = df.sort_index()
+
+    # NOTE: The start time is hardcoded for now. Once we start getting actual data, we will no longer
+    # need this. and will need to remove the next few lines.
+    start_time = "2025-03-02 12:00:00"
+    start_time = pd.to_datetime(start_time, utc=True)
+
+    # Shift the index by the time difference between the first time in the data and the start time
+    df.index = df.index - (df.index[0] - start_time)
+    # ---End of the code to be removed---
+
+    # Check for duplicate indices
+    # df = df[~df.index.duplicated(keep="first")]
+    # Save the data to a file name lexi_look_direction_data.csv
+    save_file_name = "../data/lexi_look_direction_data.csv"
+    df.to_csv(save_file_name, index=True)
+
+    return df, save_file_name
 
 
 # Function to fetch and display data based on user inputs
@@ -66,8 +105,8 @@ def fetch_data(event=None):
             return
 
         # Find the closest timestamp in the dataset
-        closest_idx = (data["epoch_utc"] - input_time).abs().idxmin()
-        row = data.iloc[closest_idx]
+        closest_idx = (merged_df["epoch_utc"] - input_time).abs().idxmin()
+        row = merged_df.iloc[closest_idx]
 
         # Clear the table
         for i in table.get_children():
@@ -76,14 +115,17 @@ def fetch_data(event=None):
         # Adjust table columns dynamically based on the dropdown selection
         if display_option == "AZ-EL":
             table["columns"] = ("Target", "AZ", "EL")
+            table.heading("Target", text="Target")
             table.heading("AZ", text="AZ")
             table.heading("EL", text="EL")
         elif display_option == "RA-Dec":
             table["columns"] = ("Target", "RA", "Dec")
+            table.heading("Target", text="Target")
             table.heading("RA", text="RA")
             table.heading("Dec", text="Dec")
         elif display_option == "Both":
             table["columns"] = ("Target", "AZ", "EL", "RA", "Dec")
+            table.heading("Target", text="Target")
             table.heading("AZ", text="AZ")
             table.heading("EL", text="EL")
             table.heading("RA", text="RA")
@@ -100,7 +142,7 @@ def fetch_data(event=None):
                 selected_keys.append(key)
 
         if not selected_keys:
-            messagebox.showwarning("Warning", "No keys selected.")
+            # messagebox.showwarning("Warning", "No keys selected.")
             return
 
         # Prepare table data based on dropdown selection and selected keys
@@ -122,7 +164,6 @@ def fetch_data(event=None):
                 el = round(np.radians(el), sig_figs) if el != "N/A" else "N/A"
                 ra = round(np.radians(ra), sig_figs) if ra != "N/A" else "N/A"
                 dec = round(np.radians(dec), sig_figs) if dec != "N/A" else "N/A"
-
             # Determine row tag (evenrow or oddrow)
             row_tag = "evenrow" if idx % 2 == 0 else "oddrow"
 
@@ -183,6 +224,43 @@ def toggle_checkboxes():
         var.set(new_state)
     fetch_data()  # Fetch data automatically
 
+
+# Get the LEXI pointing data
+_, file_name = get_lexi_look_direction_data()
+
+# Load the CSV files
+data = pd.read_csv("../data/20241114_LEXIAngleData_20250302Landing.csv")
+
+# Convert 'epoch_utc' column in 'data' to datetime and set the timezone to UTC
+data["epoch_utc"] = pd.to_datetime(data["epoch_utc"])
+data["epoch_utc"] = data["epoch_utc"].dt.tz_localize("UTC")
+
+# Set 'epoch_utc' as the index for both dataframes
+data = data.set_index("epoch_utc")
+
+
+lexi_df = pd.read_csv(file_name)
+lexi_df["epoch_utc"] = pd.to_datetime(lexi_df["epoch_utc"])
+# Ensure epoch_utc is datetime in lexi_df
+lexi_df = lexi_df.set_index("epoch_utc")
+
+# Merge the two dataframes using merge_asof (using the datetime index)
+merged_df = pd.merge_asof(
+    data,
+    lexi_df,
+    left_index=True,
+    right_index=True,
+    tolerance=pd.Timedelta("1min"),
+    direction="nearest",
+)
+
+"""
+2025-03-02 13:00:00
+"""
+# Save the merged data to CSV, with 'epoch_utc' as the index
+merged_df.to_csv("../data/merged_lexi_look_direction_data.csv", index=True)
+
+merged_df = merged_df.reset_index()
 
 # Initialize the tkinter GUI
 root = Tk()
@@ -276,7 +354,7 @@ Label(left_frame, text="Select Targets:").grid(
 
 # Creating checkboxes for each target in the keys list
 checkboxes = {}
-keys = ["Earth", "Sun", "Crab", "Sco", "Mag", "Bonus"]
+keys = ["Earth", "Sun", "Crab", "Sco", "Mag", "Bonus", "LEXI"]
 for i, key in enumerate(keys):
     var = IntVar()
     checkboxes[key] = var
@@ -305,7 +383,7 @@ Button(left_frame, text="Fetch Data", command=fetch_data, fg="green").grid(
 
 # Label to display the closest timestamp
 closest_timestamp_label = Label(right_frame, text="", fg="red")
-closest_timestamp_label.grid(row=right_row + 12, column=1, padx=5, pady=5)
+closest_timestamp_label.grid(row=right_row + 13, column=1, padx=5, pady=5)
 
 # Scrollable table for displaying results
 table_frame = ttk.Frame(root)
@@ -355,7 +433,7 @@ table.tag_configure("oddrow", background="#f7f0f0")
 # Get the columns in the table
 columns = table["columns"]
 
-print(columns)
+
 # Add scrollbars
 vsb = Scrollbar(table_frame, orient=VERTICAL, command=table.yview)
 vsb.pack(side="right", fill="y")
