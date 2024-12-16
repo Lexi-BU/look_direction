@@ -21,6 +21,34 @@ import glob
 import numpy as np
 
 
+def angular_distance(ra1, dec1, ra2, dec2):
+    """
+    Calculate the angular distance between two points on the celestial sphere
+    given their right ascension (RA) and declination (Dec) in degrees.
+    """
+    # Convert degrees to radians
+    ra1_rad = np.radians(ra1)
+    dec1_rad = np.radians(dec1)
+    ra2_rad = np.radians(ra2)
+    dec2_rad = np.radians(dec2)
+
+    # Apply the spherical law of cosines
+    cos_theta = np.sin(dec1_rad) * np.sin(dec2_rad) + np.cos(dec1_rad) * np.cos(
+        dec2_rad
+    ) * np.cos(ra1_rad - ra2_rad)
+
+    # Ensure cos_theta is within the valid range [-1, 1] due to floating point errors
+    cos_theta = np.clip(cos_theta, -1.0, 1.0)
+
+    # Calculate the angular distance in radians
+    theta_rad = np.arccos(cos_theta)
+
+    # Convert the result to degrees
+    theta_deg = np.degrees(theta_rad)
+
+    return theta_deg
+
+
 def get_lexi_look_direction_data():
     # Get all the files in the directory
     files = glob.glob("../data/from_lexi/LEXI Gimbal Angle*.csv")
@@ -114,22 +142,25 @@ def fetch_data(event=None):
 
         # Adjust table columns dynamically based on the dropdown selection
         if display_option == "AZ-EL":
-            table["columns"] = ("Target", "AZ", "EL")
+            table["columns"] = ("Target", "AZ", "EL", "Angular Distance")
             table.heading("Target", text="Target")
             table.heading("AZ", text="AZ")
             table.heading("EL", text="EL")
+            table.heading("Angular Distance", text="delta")
         elif display_option == "RA-Dec":
-            table["columns"] = ("Target", "RA", "Dec")
+            table["columns"] = ("Target", "RA", "Dec", "Angular Distance")
             table.heading("Target", text="Target")
             table.heading("RA", text="RA")
             table.heading("Dec", text="Dec")
+            table.heading("Angular Distance", text="delta")
         elif display_option == "Both":
-            table["columns"] = ("Target", "AZ", "EL", "RA", "Dec")
+            table["columns"] = ("Target", "AZ", "EL", "RA", "Dec", "Angular Distance")
             table.heading("Target", text="Target")
             table.heading("AZ", text="AZ")
             table.heading("EL", text="EL")
             table.heading("RA", text="RA")
             table.heading("Dec", text="Dec")
+            table.heading("Angular Distance", text="delta")
 
         # Set the column width dynamically
         for col in table["columns"]:
@@ -152,11 +183,13 @@ def fetch_data(event=None):
             el_col = f"el_{key.lower()}"
             ra_col = f"ra_{key.lower()}"
             dec_col = f"dec_{key.lower()}"
+            ad_col = f"angular_distance_{key.lower()}"
 
             az = round(row[az_col], sig_figs) if az_col in row.index else "N/A"
             el = round(row[el_col], sig_figs) if el_col in row.index else "N/A"
             ra = round(row[ra_col], sig_figs) if ra_col in row.index else "N/A"
             dec = round(row[dec_col], sig_figs) if dec_col in row.index else "N/A"
+            ad = round(row[ad_col], sig_figs) if ad_col in row.index else "N/A"
 
             # Convert to radians if selected
             if angle_unit == "Radians":
@@ -164,16 +197,19 @@ def fetch_data(event=None):
                 el = round(np.radians(el), sig_figs) if el != "N/A" else "N/A"
                 ra = round(np.radians(ra), sig_figs) if ra != "N/A" else "N/A"
                 dec = round(np.radians(dec), sig_figs) if dec != "N/A" else "N/A"
+                ad = round(np.radians(ad), sig_figs) if ad != "N/A" else "N/A"
             # Determine row tag (evenrow or oddrow)
             row_tag = "evenrow" if idx % 2 == 0 else "oddrow"
 
             # Insert the row with the correct tag
             if display_option == "AZ-EL":
-                table.insert("", "end", values=(key, az, el), tags=(row_tag,))
+                table.insert("", "end", values=(key, az, el, ad), tags=(row_tag,))
             elif display_option == "RA-Dec":
-                table.insert("", "end", values=(key, ra, dec), tags=(row_tag,))
+                table.insert("", "end", values=(key, ra, dec, ad), tags=(row_tag,))
             elif display_option == "Both":
-                table.insert("", "end", values=(key, az, el, ra, dec), tags=(row_tag,))
+                table.insert(
+                    "", "end", values=(key, az, el, ra, dec, ad), tags=(row_tag,)
+                )
 
         # Adjust window size dynamically
         num_rows = len(selected_keys)
@@ -253,6 +289,17 @@ merged_df = pd.merge_asof(
     tolerance=pd.Timedelta("1min"),
     direction="nearest",
 )
+
+keys = ["Earth", "Sun", "Crab", "Sco", "Mag", "Bonus", "LEXI"]
+# For each key, find the angular distance between the LEXI and target coordinates for ra and dec
+for key in keys[:-1]:
+    # Calculate the angular distance
+    merged_df[f"angular_distance_{key.lower()}"] = angular_distance(
+        merged_df[f"ra_{key.lower()}"],
+        merged_df[f"dec_{key.lower()}"],
+        merged_df["ra_lexi"],
+        merged_df["dec_lexi"],
+    )
 
 """
 2025-03-02 13:00:00
