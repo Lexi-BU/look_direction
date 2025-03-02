@@ -60,7 +60,7 @@ data["epoch_utc"] = pd.to_datetime(data["epoch_utc"])
 data["epoch_utc"] = data["epoch_utc"].dt.tz_localize("UTC")
 
 # Set the index to the epoch_utc
-data = data.set_index("epoch_utc")
+# data = data.set_index("epoch_utc")
 # Record the start time of the GUI
 
 # Reset the index for both dataframes
@@ -73,7 +73,7 @@ merged_df = pd.merge_asof(
     data,
     left_index=True,
     right_index=True,
-    tolerance=pd.Timedelta("1min"),
+    # tolerance=pd.Timedelta("1min"),
     direction="nearest",
 )
 
