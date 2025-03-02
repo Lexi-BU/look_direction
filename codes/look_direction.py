@@ -198,25 +198,35 @@ def fetch_data(event=None):
                 ra = round(np.radians(ra), sig_figs) if ra != "N/A" else "N/A"
                 dec = round(np.radians(dec), sig_figs) if dec != "N/A" else "N/A"
                 ad = round(np.radians(ad), sig_figs) if ad != "N/A" else "N/A"
+
             # Determine row tag (evenrow or oddrow)
             row_tag = "evenrow" if idx % 2 == 0 else "oddrow"
 
             # Insert the row with the correct tag
             if display_option == "AZ-EL":
-                table.insert("", "end", values=(key, az, el, ad), tags=(row_tag,))
+                values = (key, az, el, ad)
             elif display_option == "RA-Dec":
-                table.insert("", "end", values=(key, ra, dec, ad), tags=(row_tag,))
+                values = (key, ra, dec, ad)
             elif display_option == "Both":
-                table.insert(
-                    "", "end", values=(key, az, el, ra, dec, ad), tags=(row_tag,)
-                )
+                values = (key, az, el, ra, dec, ad)
+
+            # Insert row and apply tag
+            item_id = table.insert("", "end", values=values, tags=(row_tag,))
+
+            # Apply red text formatting to "ad" if its value is greater than 5
+            if angle_unit == "Degree":
+                if ad != "N/A" and ad > 5:
+                    table.item(item_id, tags=("red", row_tag))
+            elif angle_unit == "Radians":
+                if ad != "N/A" and ad > np.radians(5):
+                    table.item(item_id, tags=("red", row_tag))
 
         # Adjust window size dynamically
         num_rows = len(selected_keys)
         window_height = 600 + min(
             30 * num_rows, 400
         )  # Base height + row-dependent height
-        root.geometry(f"800x{window_height}")
+        root.geometry(f"1000x{window_height}")
 
         # Update the closest timestamp label
         closest_timestamp_label.config(
@@ -301,6 +311,8 @@ for key in keys[:-1]:
         merged_df["dec_lexi"],
     )
 
+# Select only indices where merged_df.ra_lexi is not NaN
+merged_df = merged_df[~merged_df.ra_lexi.isna()]
 """
 2025-03-02 13:00:00
 """
@@ -312,7 +324,7 @@ merged_df = merged_df.reset_index()
 # Initialize the tkinter GUI
 root = Tk()
 root.title("LEXI Pointing Data Viewer")
-root.geometry("800x600")
+root.geometry("1000x600")
 
 # Set the font for the entire GUI
 root.option_add("*Font", "Helvetica 12")
@@ -474,6 +486,7 @@ table = ttk.Treeview(
 
 table.pack(side="left", fill="both", expand=True)
 # Set custom tag styles for alternating row colors
+table.tag_configure("red", foreground="red")
 table.tag_configure("evenrow", background="#b1babf")
 table.tag_configure("oddrow", background="#f7f0f0")
 
