@@ -64,8 +64,8 @@ data["epoch_utc"] = data["epoch_utc"].dt.tz_localize("UTC")
 # Record the start time of the GUI
 
 # Reset the index for both dataframes
-data = data.reset_index()
-lexi_df = lexi_df.reset_index()
+# data = data.reset_index()
+# lexi_df = lexi_df.reset_index()
 
 # Merge the two dataframes
 merged_df = pd.merge_asof(
@@ -73,7 +73,7 @@ merged_df = pd.merge_asof(
     data,
     left_index=True,
     right_index=True,
-    # tolerance=pd.Timedelta("1min"),
+    tolerance=pd.Timedelta("1min"),
     direction="nearest",
 )
 
