@@ -280,19 +280,24 @@ data = pd.read_csv("../data/LEXIAngleData_20250304.csv")
 
 # Convert 'epoch_utc' column in 'data' to datetime and set the timezone to UTC
 data["epoch_utc"] = pd.to_datetime(data["epoch_utc"])
-# data["epoch_utc"] = data["epoch_utc"].dt.tz_localize("UTC")
+data["epoch_utc"] = data["epoch_utc"].dt.tz_localize("UTC")
 
 # Set 'epoch_utc' as the index for both dataframes
 data = data.set_index("epoch_utc")
 
+# resample the data to 1 minute intervals
+data = data.resample("1min").mean().interpolate()
 
 lexi_df = pd.read_csv(file_name)
 lexi_df["epoch_utc"] = pd.to_datetime(lexi_df["epoch_utc"])
 # Ensure epoch_utc is datetime in lexi_df
 lexi_df = lexi_df.set_index("epoch_utc")
 
-data.index = pd.to_datetime(data.index).tz_localize("UTC")
-lexi_df.index = pd.to_datetime(lexi_df.index).tz_convert("UTC")
+# resample the data to 1 minute intervals
+lexi_df = lexi_df.resample("1min").mean().interpolate()
+
+# data.index = pd.to_datetime(data.index).tz_localize("UTC")
+# lexi_df.index = pd.to_datetime(lexi_df.index).tz_convert("UTC")
 
 # Merge the two dataframes using merge_asof (using the datetime index)
 merged_df = pd.merge_asof(
@@ -303,6 +308,8 @@ merged_df = pd.merge_asof(
     direction="nearest",
 ).set_index("epoch_utc")
 
+# In case of missing data, fill both forward and backward
+merged_df = merged_df.ffill().bfill()
 
 keys = ["Earth", "Sun", "Crab", "Sco", "Mag", "Bonus", "LEXI"]
 # For each key, find the angular distance between the LEXI and target coordinates for ra and dec
@@ -315,8 +322,11 @@ for key in keys[:-1]:
         merged_df["dec_lexi"],
     )
 
+# From ra_mag, modify it to ra_mag - 360
+merged_df["ra_mag"] = merged_df["ra_mag"] - 360
+
 # Select only indices where merged_df.ra_lexi is not NaN
-merged_df = merged_df[~merged_df.ra_lexi.isna()]
+# merged_df = merged_df[~merged_df.ra_lexi.isna()]
 """
 2025-03-02 13:00:00
 """
@@ -394,7 +404,7 @@ Entry(right_frame, textvariable=significant_figures_input, width=10).grid(
 Label(left_frame, text="Select Data to Display:").grid(
     row=left_row + 4, column=0, sticky="w", padx=5, pady=5
 )
-dropdown_selection = StringVar(value="AZ-EL")
+dropdown_selection = StringVar(value="RA-Dec")
 dropdown_menu = OptionMenu(
     right_frame, dropdown_selection, "AZ-EL", "RA-Dec", "Both", command=fetch_data
 )
