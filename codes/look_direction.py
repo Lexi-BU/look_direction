@@ -296,6 +296,12 @@ lexi_df = lexi_df.set_index("epoch_utc")
 # resample the data to 1 minute intervals
 lexi_df = lexi_df.resample("1min").mean().interpolate()
 
+# lexi_df_resampled_1sec = lexi_df.resample("1s").mean().interpolate()
+# Save the data
+# lexi_df_resampled_1sec.to_csv("../data/lexi_look_direction_data_resampled_1sec.csv", index=True)
+# Save the data
+# lexi_df.to_csv("../data/lexi_look_direction_data_resampled.csv", index=True)
+
 # data.index = pd.to_datetime(data.index).tz_localize("UTC")
 # lexi_df.index = pd.to_datetime(lexi_df.index).tz_convert("UTC")
 
