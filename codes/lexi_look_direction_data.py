@@ -1,10 +1,11 @@
-import pandas as pd
 import glob
+
+import pandas as pd
 
 
 def get_lexi_look_direction_data():
     # Get all the files in the directory
-    files = glob.glob("../data/from_lexi/LEXI Gimbal Angle*.csv")
+    files = glob.glob("../data/LEXI_gimbal_pointing_values/LEXI_Pointing_Measured*.csv")
 
     print(f"Found {len(files)} files")
     # Create an empty dataframe
@@ -53,32 +54,41 @@ if __name__ == "__main__":
 
 
 lexi_df = pd.read_csv("../data/lexi_look_direction_data.csv")
+#  Sed epoch_utc to datetime
+lexi_df["epoch_utc"] = pd.to_datetime(lexi_df["epoch_utc"])
+
+# Set epoch_utc as the index
+lexi_df = lexi_df.set_index("epoch_utc")
+
+
 # Load the CSV file
-data = pd.read_csv("../data/20241114_LEXIAngleData_20250302Landing.csv")
+data = pd.read_csv("../data/LEXIAngleData_20250304.csv")
 data["epoch_utc"] = pd.to_datetime(data["epoch_utc"])
 # Set the timezones to UTC
 data["epoch_utc"] = data["epoch_utc"].dt.tz_localize("UTC")
 
 # Set the index to the epoch_utc
-# data = data.set_index("epoch_utc")
+data = data.set_index("epoch_utc")
 # Record the start time of the GUI
 
 # Reset the index for both dataframes
 # data = data.reset_index()
+#
 # lexi_df = lexi_df.reset_index()
 
+df_merged = pd.merge(data, lexi_df, on="epoch_utc", how="outer")
 # Merge the two dataframes
-merged_df = pd.merge_asof(
-    lexi_df,
-    data,
-    left_index=True,
-    right_index=True,
-    tolerance=pd.Timedelta("1min"),
-    direction="nearest",
-)
+# merged_df = pd.merge_asof(
+#     lexi_df,
+#     data,
+#     left_index=True,
+#     right_index=True,
+#     tolerance=pd.Timedelta("1min"),
+#     direction="nearest",
+# )
 
 # Set the index to the epoch_utc
-merged_df = merged_df.set_index("epoch_utc")
+# df_merged = df_merged.set_index("epoch_utc")
 
 # Save the data
-merged_df.to_csv("../data/merged_lexi_look_direction_data.csv", index=True)
+df_merged.to_csv("../data/merged_lexi_look_direction_data_20250306.csv", index=True)

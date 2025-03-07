@@ -1,24 +1,25 @@
-import pandas as pd
-from tkinter import (
-    Tk,
-    Label,
-    Entry,
-    Button,
-    StringVar,
-    OptionMenu,
-    Checkbutton,
-    IntVar,
-    messagebox,
-    ttk,
-    DISABLED,
-    NORMAL,
-    Scrollbar,
-    VERTICAL,
-    HORIZONTAL,
-)
 import datetime
 import glob
+from tkinter import (
+    DISABLED,
+    HORIZONTAL,
+    NORMAL,
+    VERTICAL,
+    Button,
+    Checkbutton,
+    Entry,
+    IntVar,
+    Label,
+    OptionMenu,
+    Scrollbar,
+    StringVar,
+    Tk,
+    messagebox,
+    ttk,
+)
+
 import numpy as np
+import pandas as pd
 
 
 def angular_distance(ra1, dec1, ra2, dec2):
@@ -51,7 +52,7 @@ def angular_distance(ra1, dec1, ra2, dec2):
 
 def get_lexi_look_direction_data():
     # Get all the files in the directory
-    files = glob.glob("../data/from_lexi/LEXI Gimbal Angle*.csv")
+    files = glob.glob("../data/LEXI_gimbal_pointing_values/LEXI_Pointing_Measured*.csv")
 
     # Create an empty dataframe
     df_list = []
@@ -80,11 +81,11 @@ def get_lexi_look_direction_data():
 
     # NOTE: The start time is hardcoded for now. Once we start getting actual data, we will no longer
     # need this. and will need to remove the next few lines.
-    start_time = "2025-03-02 12:00:00"
-    start_time = pd.to_datetime(start_time, utc=True)
+    # start_time = "2025-03-02 12:00:00"
+    # start_time = pd.to_datetime(start_time, utc=True)
 
-    # Shift the index by the time difference between the first time in the data and the start time
-    df.index = df.index - (df.index[0] - start_time)
+    # # Shift the index by the time difference between the first time in the data and the start time
+    # df.index = df.index - (df.index[0] - start_time)
     # ---End of the code to be removed---
 
     # Check for duplicate indices
@@ -275,11 +276,11 @@ def toggle_checkboxes():
 _, file_name = get_lexi_look_direction_data()
 
 # Load the CSV files
-data = pd.read_csv("../data/20241114_LEXIAngleData_20250302Landing.csv")
+data = pd.read_csv("../data/LEXIAngleData_20250304.csv")
 
 # Convert 'epoch_utc' column in 'data' to datetime and set the timezone to UTC
 data["epoch_utc"] = pd.to_datetime(data["epoch_utc"])
-data["epoch_utc"] = data["epoch_utc"].dt.tz_localize("UTC")
+# data["epoch_utc"] = data["epoch_utc"].dt.tz_localize("UTC")
 
 # Set 'epoch_utc' as the index for both dataframes
 data = data.set_index("epoch_utc")
@@ -290,15 +291,18 @@ lexi_df["epoch_utc"] = pd.to_datetime(lexi_df["epoch_utc"])
 # Ensure epoch_utc is datetime in lexi_df
 lexi_df = lexi_df.set_index("epoch_utc")
 
+data.index = pd.to_datetime(data.index).tz_localize("UTC")
+lexi_df.index = pd.to_datetime(lexi_df.index).tz_convert("UTC")
+
 # Merge the two dataframes using merge_asof (using the datetime index)
 merged_df = pd.merge_asof(
-    data,
-    lexi_df,
-    left_index=True,
-    right_index=True,
-    tolerance=pd.Timedelta("1min"),
+    data.reset_index(),
+    lexi_df.reset_index(),
+    on="epoch_utc",
+    tolerance=pd.Timedelta(minutes=1),
     direction="nearest",
-)
+).set_index("epoch_utc")
+
 
 keys = ["Earth", "Sun", "Crab", "Sco", "Mag", "Bonus", "LEXI"]
 # For each key, find the angular distance between the LEXI and target coordinates for ra and dec
